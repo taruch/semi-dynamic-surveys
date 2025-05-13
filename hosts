@@ -1,0 +1,2 @@
+[all]
+laptop ansible_host=192.168.31.60 ansible_user=truch

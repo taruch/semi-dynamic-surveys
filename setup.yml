@@ -1,0 +1,20 @@
+---
+- name: Playbook to configure ansible controller post installation
+  hosts: localhost
+  connection: local
+  # Define following vars here, or in platform_configs/controller_auth.yml
+  # or in platform_configs/controller_config.yml
+  vars:
+    aap_controller_verify_ssl: false
+    aap_validate_certs: false
+
+  pre_tasks:
+    - name: Include vars from platform_configs directory
+      ansible.builtin.include_vars:
+        dir: ./role_vars
+        ignore_files: [controller_config.yml.template]
+        extensions: ["yml"]
+
+
+  roles:
+    - {role: infra.aap_configuration.controller_job_templates, when: controller_templates is defined}

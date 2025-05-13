@@ -1,0 +1,112 @@
+---
+- name: Get AWS Networks
+  hosts: localhost
+  gather_facts: false
+  become: false
+  vars:
+    aws_region: us-east-2
+    vpc_id: vpc-051a39812a5ef15b5
+
+  tasks:
+    # - name: Get AWS VPC ID
+    #   amazon.aws.ec2_vpc_info:
+    #     region: "{{ aws_region }}"
+    #   register: vpc_info
+
+    # - name: Display VPC ID
+    #   debug:
+    #     msg: "{{ vpc_info.vpcs | map(attribute='vpc_id') | list }}"
+
+    - name: Get AWS networks
+      amazon.aws.ec2_vpc_subnet_info:
+        region: "{{ aws_region }}"
+        # filters:
+        filters:
+          vpc-id: "{{ vpc_id }}"
+      register: networks
+
+    - name: Print networks
+      when: networks.subnets is defined
+      loop: "{{ networks.subnets }}"
+      loop_control:
+        loop_var: subnets
+      ansible.builtin.debug:
+        msg: "{{ networks.subnets }}"
+
+    - name: debug data
+      ansible.builtin.debug:
+        var: (groups['all'] | first)
+
+    - name: Write networks to file
+      when: networks.subnets is defined
+      run_once: true
+      delegate_to: laptop
+      ansible.builtin.copy:
+        content: "{{ networks.subnets | map(attribute='subnet_id') | list | to_yaml }}"
+        dest: /tmp/aws_networks.txt
+        mode: '0644'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: GitOps functions
+      delegate_to: localhost
+      when: ansible_network_resources is defined
+      block:
+        - name: Retrieve a repository from a distant location and make it available locally
+          ansible.scm.git_retrieve:
+            origin:
+              url: "http://gitea:gitea@{{ hostvars['gitea'].public_dns_name }}/gitea/gitea/network-demos-repo.git"
+              token: "{{ password }}"
+          register: repository
+
+        - name: Debug repository data
+          ansible.builtin.debug:
+            var: repository
+            verbosity: 2
+
+        - name: Create a host_vars directory if it does not exist
+          ansible.builtin.file:
+            path: "{{ repository['path'] }}/base_configuration/host_vars"
+            state: directory
+            mode: '0755'
+
+        - name: Create a backup directory if it does not exist
+          ansible.builtin.file:
+            path: "{{ repository['path'] }}/base_configuration/config_backups"
+            state: directory
+            mode: '0755'
+
+        - name: Add network facts to the repository
+          ansible.builtin.copy:
+            content: "{{ ansible_network_resources | to_nice_yaml }}"
+            dest: "{{ repository['path'] }}/base_configuration/host_vars/{{ inventory_hostname }}"
+          register: result
+
+        - name: Create a backup directory if it does not exist
+          ansible.builtin.file:
+            path: "{{ repository['path'] }}/base_configuration/config_backups"
+            state: directory
+            mode: '0755'
+
+        - name: Add config_backup to the repository
+          ansible.builtin.copy:
+            src: "/tmp/{{ inventory_hostname }}.txt"
+            dest: "{{ repository['path'] }}/base_configuration/config_backups/{{ inventory_hostname }}.txt"
+          register: result
+
+        - name: Set date_time variable
+          ansible.builtin.set_fact:
+            date_time: "{{ lookup('pipe', 'date +%Y-%m-%d%H:%M:%S') }}"
+
+        - name: Publish the changes
+          when: result.changed
+          ansible.scm.git_publish:
+            commit:
+              message: "Update at {{ date_time }}"
+            include: "--all"
+            path: "{{ repository['path'] }}"
+            token: "{{ password }}"
+            user:
+              name: "{{ username }}"
+              email: "{{ email }}"
+      ### End of GitOps Block

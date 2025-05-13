@@ -1,0 +1,15 @@
+---
+ansible-navigator:
+  ansible:
+    inventory:
+      entries:
+      - hosts
+  execution-environment:
+    container-engine: podman
+    enabled: true
+    image: quay.io/ansible-product-demos/apd-ee-25:latest
+  logging:
+      level: critical
+  playbook-artifact:
+    save-as: artifacts/{playbook_name}-artifact-{time_stamp}.json
+    
