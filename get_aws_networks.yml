@@ -67,7 +67,8 @@
           ansible.scm.git_retrieve:
             origin:
               url: "https://github.com/taruch/semi-dynamic-surveys.git"
-              token: "{{ lookup('ansible.builtin.env', 'GITHUB_TOKEN') }}"
+              # token: "{{ lookup('ansible.builtin.env', 'GITHUB_TOKEN') }}"
+              token: "{{ token }}"
           register: repository
 
         - name: Debug repository data
@@ -101,7 +102,8 @@
               message: "Update at {{ date_time }}"
             include: "--all"
             path: "{{ repository['path'] }}"
-            token: "{{ lookup('ansible.builtin.env', 'GITHUB_TOKEN') }}" 
+            # token: "{{ lookup('ansible.builtin.env', 'GITHUB_TOKEN') }}" 
+            token: "{{ token }}"
             user:
               name: "{{ username }}"
               email: "{{ email }}"
