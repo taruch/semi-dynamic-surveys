@@ -66,7 +66,7 @@
         - name: Retrieve a repository from a distant location and make it available locally
           ansible.scm.git_retrieve:
             origin:
-              # url: "https://github.com/taruch/semi-dynamic-surveys.git"
+              url: "https://github.com/taruch/semi-dynamic-surveys.git"
               token: "{{ lookup('ansible.builtin.env', 'GITHUB_TOKEN') }}"
           register: repository
 
