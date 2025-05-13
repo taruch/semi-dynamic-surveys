@@ -6,6 +6,8 @@
   vars:
     aws_region: us-east-2
     vpc_id: vpc-051a39812a5ef15b5
+    username: "Todd Ruch"
+    email: "truch@redhat.com"
 
   tasks:
     # - name: Get AWS VPC ID
@@ -33,30 +35,39 @@
       ansible.builtin.debug:
         msg: "{{ networks.subnets }}"
 
+    - name: Create network cidr list
+      when: networks.subnets is defined
+      set_fact:
+        network_cidrs: "networks: {{ networks.subnets | map(attribute='cidr_block') | list }}"
+
+    - name: Debug repository data
+      ansible.builtin.debug:
+        var: network_cidrs
+        verbosity: 2
+
     - name: debug data
       ansible.builtin.debug:
         var: (groups['all'] | first)
 
-    - name: Write networks to file
-      when: networks.subnets is defined
-      run_once: true
-      delegate_to: laptop
-      ansible.builtin.copy:
-        content: "{{ networks.subnets | map(attribute='subnet_id') | list | to_yaml }}"
-        dest: /tmp/aws_networks.txt
-        mode: '0644'
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
+    # - name: Write networks to file
+    #   when: networks.subnets is defined
+    #   run_once: true
+    #   delegate_to: laptop
+    #   ansible.builtin.copy:
+    #     content: "{{ networks.subnets | map(attribute='subnet_id') | list | to_yaml }}"
+    #     dest: /tmp/aws_networks.txt
+    #     mode: '0644'
+    #     owner: "{{ ansible_user }}"
+    #     group: "{{ ansible_user }}"
 
     - name: GitOps functions
-      delegate_to: localhost
-      when: ansible_network_resources is defined
+      when: networks.subnets is defined
       block:
         - name: Retrieve a repository from a distant location and make it available locally
           ansible.scm.git_retrieve:
             origin:
-              url: "http://gitea:gitea@{{ hostvars['gitea'].public_dns_name }}/gitea/gitea/network-demos-repo.git"
-              token: "{{ password }}"
+              url: "https://github.com/taruch/semi-dynamic-surveys.git"
+              token: "{{ lookup('ansible.builtin.env', 'GITHUB_TOKEN') }}"
           register: repository
 
         - name: Debug repository data
@@ -66,34 +77,19 @@
 
         - name: Create a host_vars directory if it does not exist
           ansible.builtin.file:
-            path: "{{ repository['path'] }}/base_configuration/host_vars"
-            state: directory
-            mode: '0755'
-
-        - name: Create a backup directory if it does not exist
-          ansible.builtin.file:
-            path: "{{ repository['path'] }}/base_configuration/config_backups"
+            path: "{{ repository['path'] }}/role_vars"
             state: directory
             mode: '0755'
 
         - name: Add network facts to the repository
           ansible.builtin.copy:
-            content: "{{ ansible_network_resources | to_nice_yaml }}"
-            dest: "{{ repository['path'] }}/base_configuration/host_vars/{{ inventory_hostname }}"
+            # content: "{{ network_cidrs | to_nice_yaml }}"
+            content: "{{ network_cidrs  }}"
+
+            dest: "{{ repository['path'] }}/role_vars/networks.yml"
+            mode: '0644'
           register: result
-
-        - name: Create a backup directory if it does not exist
-          ansible.builtin.file:
-            path: "{{ repository['path'] }}/base_configuration/config_backups"
-            state: directory
-            mode: '0755'
-
-        - name: Add config_backup to the repository
-          ansible.builtin.copy:
-            src: "/tmp/{{ inventory_hostname }}.txt"
-            dest: "{{ repository['path'] }}/base_configuration/config_backups/{{ inventory_hostname }}.txt"
-          register: result
-
+      
         - name: Set date_time variable
           ansible.builtin.set_fact:
             date_time: "{{ lookup('pipe', 'date +%Y-%m-%d%H:%M:%S') }}"
@@ -105,7 +101,7 @@
               message: "Update at {{ date_time }}"
             include: "--all"
             path: "{{ repository['path'] }}"
-            token: "{{ password }}"
+            token: "{{ lookup('ansible.builtin.env', 'GITHUB_TOKEN') }}" 
             user:
               name: "{{ username }}"
               email: "{{ email }}"
