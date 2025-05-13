@@ -1,0 +1,5 @@
+---
+networks:
+{% for cidr in networks | sort %}
+  - {{ cidr }}
+{% endfor %}

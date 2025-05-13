@@ -38,7 +38,7 @@
     - name: Create network cidr list
       when: networks.subnets is defined
       set_fact:
-        network_cidrs: "networks: {{ networks.subnets | map(attribute='cidr_block') | list }}"
+        networks: "{{ networks.subnets | map(attribute='cidr_block') | list }}"
 
     - name: Debug repository data
       ansible.builtin.debug:
@@ -61,7 +61,7 @@
     #     group: "{{ ansible_user }}"
 
     - name: GitOps functions
-      when: networks.subnets is defined
+      when: networks is defined
       block:
         - name: Retrieve a repository from a distant location and make it available locally
           ansible.scm.git_retrieve:
@@ -82,14 +82,14 @@
             mode: '0755'
 
         - name: Add network facts to the repository
-          ansible.builtin.copy:
+          ansible.builtin.template:
             # content: "{{ network_cidrs | to_nice_yaml }}"
-            content: "{{ network_cidrs  }}"
-
+            # content: "{{ networks | to_nice_yaml }}"
+            src: templates/networks.j2
             dest: "{{ repository['path'] }}/role_vars/networks.yml"
             mode: '0644'
           register: result
-      
+
         - name: Set date_time variable
           ansible.builtin.set_fact:
             date_time: "{{ lookup('pipe', 'date +%Y-%m-%d%H:%M:%S') }}"
